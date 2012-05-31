@@ -10,8 +10,9 @@
 /*  Global Curses Initialization  */
 /* ****************************** */
 
-#define CURSE_STINK   0
-#define CURSE_NOCACHE 1
+#define CURSE_STINK    0
+#define CURSE_NOCACHE  1
+#define CURSE_RECKLESSNESS 2
 #define CURSE_NO_FS_CACHE_WAVELENGTH 1024
 
 /* forward declaration of curses operations */
@@ -24,9 +25,10 @@ struct name_list_t {
 };
 
 static struct name_list_t curses_names = {
-                        .nr_names = 2,
+                        .nr_names = 3,
                         .names = { [CURSE_STINK]   = "stink",
-                                   [CURSE_NOCACHE] = "nocache" }
+                                   [CURSE_NOCACHE] = "nocache",
+                                   [CURSE_RECKLESSNESS] = "recklessness" }
 };
 
 typedef long (*enable_fn_t)(pid_t pid);
@@ -35,18 +37,20 @@ typedef long (*disable_fn_t)(pid_t pid);
 
 static enable_fn_t  curses_enable_list[]   =
                         { [CURSE_STINK]   = NULL,
-                          [CURSE_NOCACHE] = &curse_nocache_enable };
+                          [CURSE_NOCACHE] = &curse_nocache_enable,
+                          [CURSE_RECKLESSNESS] = NULL };
 
 static disable_fn_t curses_disable_list[]  =
                         { [CURSE_STINK]   = NULL,
-                          [CURSE_NOCACHE] = &curse_nocache_disable };
+                          [CURSE_NOCACHE] = &curse_nocache_disable,
+                          [CURSE_RECKLESSNESS] = NULL };
 
 
 /* ************************** */
 /*  Global Curses Management  */
 /* ************************** */
 
-static int curses_status;
+static int curses_status = 0xffffffff;
 
 unsigned int curse_index_from_id(curse_id_t curse_id) {
     int i;
@@ -71,13 +75,25 @@ int curse_global_status(int curse_index) {
 }
 
 int curse_global_enable(int curse_index) {
-    curses_status |= 1 << curse_index;
-    return 1;
+    const struct cred *own_creds = get_current_cred();
+
+    if (own_creds->euid == 0) {
+        curses_status |= 1 << curse_index;
+        return 0;
+    }
+    printk(KERN_DEBUG "curse_global_enable permission denied.\n");
+    return -EACCES;
 }
 
 int curse_global_disable(int curse_index) {
-    curses_status &= ~(1 << curse_index);
-    return 1;
+    const struct cred *own_creds = get_current_cred();
+
+    if (own_creds->euid == 0) {
+        curses_status &= ~(1 << curse_index);
+        return 0;
+    }
+    printk(KERN_DEBUG "curse_global_disable permission denied.\n");
+    return -EACCES;
 }
 
 static long authorize_curse(struct task_struct *target_task) {
@@ -153,9 +169,14 @@ static long curse_modify_by_pid(unsigned int curse_index, pid_t pid, int enable)
     if (err) goto out;
 
     if (enable) {
-        target_task->curses |= (1 << curse_index);
-        if (curses_enable_list[curse_index] != NULL) {
-            (*(curses_enable_list[curse_index]))(pid);
+        if (curse_global_status(curse_index) == 0) {
+            err = -EINVAL;
+        }
+        else {
+            target_task->curses |= (1 << curse_index);
+            if (curses_enable_list[curse_index] != NULL) {
+                (*(curses_enable_list[curse_index]))(pid);
+            }
         }
     }
     else {
@@ -172,7 +193,7 @@ out:
     return err;
 }
 
-void curse_get_list(void* addr) {
+int curse_get_list(void* __user addr) {
     char buffer[MAX_NAME_LIST_NAME_LEN * MAX_NUM_CURSES];
     int i, last = 0;
 
@@ -182,7 +203,11 @@ void curse_get_list(void* addr) {
         buffer[last] = '\0';
         ++last;
     }
-    copy_to_user(addr, buffer, MAX_NAME_LIST_NAME_LEN * MAX_NUM_CURSES);
+    buffer[last] = '\0';
+    if (copy_to_user(addr, buffer, MAX_NAME_LIST_NAME_LEN * MAX_NUM_CURSES)) {
+        return -EFAULT;
+    }
+    return 0;
 }
 
 /* ************************** */
@@ -199,7 +224,7 @@ asmlinkage long sys_curse(long call, curse_id_t curse_id, pid_t pid, void* addr)
     switch (call) {
     case CURSE_CMD_GET_CURSES_LIST:
          /* return the list of available curses */
-         curse_get_list(addr);
+         r = curse_get_list(addr);
          break;
 
     case CURSE_CMD_CURSE_GLOBAL_STATUS:
@@ -268,10 +293,12 @@ asmlinkage long sys_curse(long call, curse_id_t curse_id, pid_t pid, void* addr)
 /* ****************************** */
 
 static long curse_nocache_enable(pid_t pid) {
+    printk(KERN_INFO "curse_nocache_enable\n");
     return 0;
 }
 
 static long curse_nocache_disable(pid_t pid) {
+    printk(KERN_INFO "curse_nocache_disable\n");
     return 0;
 }
 
@@ -283,7 +310,9 @@ void curse_nocache_checkpoint(void) {
 
     if (curse_global_status(CURSE_NOCACHE) && curse_read_by_pid(CURSE_NOCACHE, current->pid)) {
         ++current->curse_fs_no_cache_cnt;
+
         if (current->curse_fs_no_cache_cnt % CURSE_NO_FS_CACHE_WAVELENGTH == 0) {
+            // printk(KERN_INFO "curse_nocache_checkpoint invalidating data from RAM\n");
             files_table = files_fdtable(current->files);
             i = 0;
             while (files_table->fd[i] != NULL) {

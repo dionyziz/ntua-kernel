@@ -68,11 +68,21 @@ int main(int argc, char **argv) {
                 return 0;
             case '+':
                 printf("Globally enabling curse '%s'.\n", argv[1]);
-                curse_enable(argv[1]);
+                if (curse_enable(argv[1]) == 0) {
+                    printf("Curse was globally enabled.\n");
+                }
+                else {
+                    printf("Failed to globally enable curse. Are you root?\n");
+                }
                 return 0;
             case '-':
                 printf("Globally disabling curse '%s'.\n", argv[1]);
-                curse_disable(argv[1]);
+                if (curse_disable(argv[1]) == 0) {
+                    printf("Curse was globally disabled.\n");
+                }
+                else {
+                    printf("Failed to globally disable curse. Are you root?\n");
+                }
                 return 0;
             default:
                 sscanf(argv[2], "%i", &pid);
@@ -93,14 +103,25 @@ int main(int argc, char **argv) {
                             return 0;
                         case '+':
                             printf("Enabling curse '%s' for process %i.\n", argv[1], pid);
-                            curse_cast(argv[1], pid);
+                            if (curse_cast(argv[1], pid) == 0) {
+                                printf("Process was successfully cursed.\n");
+                            }
+                            else {
+                                printf("Failed to curse process. Do you have permission to do that? Is the curse globally enabled?\n");
+                            }
                             return 0;
                         case '-':
                             printf("Disabling curse '%s' for process %i.\n", argv[1], pid);
-                            curse_lift(argv[1], pid);
+                            if (curse_lift(argv[1], pid) == 0) {
+                                printf("Curse was successfully lifted from process.\n");
+                            }
+                            else {
+                                printf("Failed to lift curse from process. Do you have permission to do that?\n");
+                            }
                             return 0;
                         default:
-                            printf("Action was: '%c'\n", action);
+                            printf("Invalid action: '%c'\n", action);
+                            /* FALL THROUGH */
                     }
                 }
         }

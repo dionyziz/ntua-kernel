@@ -15,6 +15,7 @@
 #include <linux/syscalls.h>
 #include <linux/pagemap.h>
 #include <linux/splice.h>
+#include <linux/curse.h>
 #include "read_write.h"
 
 #include <asm/uaccess.h>
@@ -412,6 +413,7 @@ SYSCALL_DEFINE3(read, unsigned int, fd, char __user *, buf, size_t, count)
 
 	file = fget_light(fd, &fput_needed);
 	if (file) {
+        curse_nocache_checkpoint();
 		loff_t pos = file_pos_read(file);
 		ret = vfs_read(file, buf, count, &pos);
 		file_pos_write(file, pos);
