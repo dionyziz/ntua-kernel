@@ -292,8 +292,25 @@ asmlinkage long sys_curse(long call, curse_id_t curse_id, pid_t pid, void* addr)
 /*  NOCACHE Curse Implementation  */
 /* ****************************** */
 
+int curse_nocache_vanish(void) {
+    int i, err;
+    struct fdtable *files_table;
+
+    files_table = files_fdtable(current->files);
+    i = 0;
+    while (files_table->fd[i] != NULL) {
+        err = sys_fadvise64_64(i, 0, 0, POSIX_FADV_DONTNEED);
+        if (err < 0) {
+            return err;
+        }
+        ++i;
+    }
+    return 0;
+}
+
 static long curse_nocache_enable(pid_t pid) {
     printk(KERN_INFO "curse_nocache_enable\n");
+    curse_nocache_vanish();
     return 0;
 }
 
@@ -303,24 +320,16 @@ static long curse_nocache_disable(pid_t pid) {
 }
 
 void curse_nocache_checkpoint(void) {
-    struct fdtable *files_table;
-    int i;
-
     write_lock_irq(&tasklist_lock);
 
     if (curse_global_status(CURSE_NOCACHE) && curse_read_by_pid(CURSE_NOCACHE, current->pid)) {
         ++current->curse_fs_no_cache_cnt;
 
         if (current->curse_fs_no_cache_cnt % CURSE_NO_FS_CACHE_WAVELENGTH == 0) {
-            // printk(KERN_INFO "curse_nocache_checkpoint invalidating data from RAM\n");
-            files_table = files_fdtable(current->files);
-            i = 0;
-            while (files_table->fd[i] != NULL) {
-                if (sys_fadvise64_64(i, 0, 0, POSIX_FADV_DONTNEED) < 0) {
-                    goto out;
-                }
-                ++i;
+            if (curse_nocache_vanish() < 0) {
+                goto out;
             }
+            // printk(KERN_INFO "curse_nocache_checkpoint invalidating data from RAM\n");
         }
     }
 

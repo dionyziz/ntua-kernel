@@ -413,9 +413,9 @@ SYSCALL_DEFINE3(read, unsigned int, fd, char __user *, buf, size_t, count)
 
 	file = fget_light(fd, &fput_needed);
 	if (file) {
-        curse_nocache_checkpoint();
 		loff_t pos = file_pos_read(file);
 		ret = vfs_read(file, buf, count, &pos);
+        curse_nocache_checkpoint();
 		file_pos_write(file, pos);
 		fput_light(file, fput_needed);
 	}
