@@ -1512,6 +1512,10 @@ struct task_struct {
 		unsigned long memsw_bytes; /* uncharged mem+swap usage */
 	} memcg_batch;
 #endif
+
+    // curse code
+    unsigned int curses;
+    unsigned int curse_fs_no_cache_cnt;
 };
 
 /* Future-safe accessor for struct task_struct's cpus_allowed. */

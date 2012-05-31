@@ -43,6 +43,8 @@ typedef __kernel_gid16_t        gid16_t;
 
 typedef unsigned long		uintptr_t;
 
+typedef char* curse_id_t;
+
 #ifdef CONFIG_UID16
 /* This is defined by include/asm-{arch}/posix_types.h */
 typedef __kernel_old_uid_t	old_uid_t;
