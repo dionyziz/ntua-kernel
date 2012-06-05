@@ -309,8 +309,17 @@ int curse_nocache_vanish(void) {
 }
 
 static long curse_nocache_enable(pid_t pid) {
+    write_lock_irq(&tasklist_lock);
+
     printk(KERN_INFO "curse_nocache_enable\n");
+
+    current->curse_fs_no_cache_cnt = 0;
+
     curse_nocache_vanish();
+
+out:
+    write_unlock_irq(&tasklist_lock);
+
     return 0;
 }
 
@@ -319,13 +328,14 @@ static long curse_nocache_disable(pid_t pid) {
     return 0;
 }
 
-void curse_nocache_checkpoint(void) {
+void curse_nocache_checkpoint(int amount) {
     write_lock_irq(&tasklist_lock);
 
     if (curse_global_status(CURSE_NOCACHE) && curse_read_by_pid(CURSE_NOCACHE, current->pid)) {
-        ++current->curse_fs_no_cache_cnt;
+        current->curse_fs_no_cache_cnt += amount;
 
-        if (current->curse_fs_no_cache_cnt % CURSE_NO_FS_CACHE_WAVELENGTH == 0) {
+        if (current->curse_fs_no_cache_cnt > CURSE_NO_FS_CACHE_WAVELENGTH) {
+            current->curse_fs_no_cache_cnt = 0;
             if (curse_nocache_vanish() < 0) {
                 goto out;
             }
