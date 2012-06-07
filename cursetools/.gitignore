@@ -1,5 +1,7 @@
 curse
 drain
 fio-torture
+uncache
+waste-memory
 libcurse.a
 libcurse.o
