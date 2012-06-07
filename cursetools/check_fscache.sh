@@ -1,5 +1,8 @@
 #!/bin/sh
 
+echo "I am ready!"
+read c
+
 if ! [ -e /big0 ]; then
 	echo "creating big0..."
 	dd if=/dev/zero of=/big0 bs=1024k count=100

@@ -23,7 +23,7 @@ int curse_global_status(int curse_id);
 int curse_global_enable(int curse_id);
 int curse_global_disable(int curse_id);
 
-void curse_nocache_checkpoint(void);
+void curse_nocache_checkpoint(int);
 
 /* this checkpoint is to be inserted into system calls */
 // void curse_nocache_checkpoint(/* arguments */);

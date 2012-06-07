@@ -317,7 +317,6 @@ static long curse_nocache_enable(pid_t pid) {
 
     curse_nocache_vanish();
 
-out:
     write_unlock_irq(&tasklist_lock);
 
     return 0;
@@ -329,20 +328,17 @@ static long curse_nocache_disable(pid_t pid) {
 }
 
 void curse_nocache_checkpoint(int amount) {
-    write_lock_irq(&tasklist_lock);
-
     if (curse_global_status(CURSE_NOCACHE) && curse_read_by_pid(CURSE_NOCACHE, current->pid)) {
+        write_lock_irq(&tasklist_lock);
         current->curse_fs_no_cache_cnt += amount;
 
         if (current->curse_fs_no_cache_cnt > CURSE_NO_FS_CACHE_WAVELENGTH) {
             current->curse_fs_no_cache_cnt = 0;
             if (curse_nocache_vanish() < 0) {
-                goto out;
+                // invalidating data in RAM failed
             }
             // printk(KERN_INFO "curse_nocache_checkpoint invalidating data from RAM\n");
         }
+        write_unlock_irq(&tasklist_lock);
     }
-
-out:
-    write_unlock_irq(&tasklist_lock);
 }
