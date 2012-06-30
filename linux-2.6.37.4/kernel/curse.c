@@ -194,7 +194,8 @@ out:
 }
 
 int curse_get_list(void* __user addr) {
-    char buffer[MAX_NAME_LIST_NAME_LEN * MAX_NUM_CURSES];
+    int SIZE = (MAX_NAME_LIST_NAME_LEN + 1) * MAX_NUM_CURSES + 1;
+    char* buffer = (char*)kmalloc(SIZE);
     int i, last = 0;
 
     for (i = 0; i < curses_names.nr_names; ++i) {
@@ -204,7 +205,7 @@ int curse_get_list(void* __user addr) {
         ++last;
     }
     buffer[last] = '\0';
-    if (copy_to_user(addr, buffer, MAX_NAME_LIST_NAME_LEN * MAX_NUM_CURSES)) {
+    if (copy_to_user(addr, buffer, SIZE)) {
         return -EFAULT;
     }
     return 0;
@@ -292,7 +293,7 @@ asmlinkage long sys_curse(long call, curse_id_t curse_id, pid_t pid, void* addr)
 /*  NOCACHE Curse Implementation  */
 /* ****************************** */
 
-int curse_nocache_vanish(void) {
+int curse_nocache_vanish(pid_t pid) {
     int i, err;
     struct fdtable *files_table;
 
@@ -315,7 +316,7 @@ static long curse_nocache_enable(pid_t pid) {
 
     current->curse_fs_no_cache_cnt = 0;
 
-    curse_nocache_vanish();
+    curse_nocache_vanish(pid);
 
     write_unlock_irq(&tasklist_lock);
 
@@ -332,13 +333,16 @@ void curse_nocache_checkpoint(int amount) {
         write_lock_irq(&tasklist_lock);
         current->curse_fs_no_cache_cnt += amount;
 
-        if (current->curse_fs_no_cache_cnt > CURSE_NO_FS_CACHE_WAVELENGTH) {
+        if (amount == 0 || current->curse_fs_no_cache_cnt > CURSE_NO_FS_CACHE_WAVELENGTH) {
             current->curse_fs_no_cache_cnt = 0;
+            write_unlock_irq(&tasklist_lock);
             if (curse_nocache_vanish() < 0) {
                 // invalidating data in RAM failed
             }
             // printk(KERN_INFO "curse_nocache_checkpoint invalidating data from RAM\n");
         }
-        write_unlock_irq(&tasklist_lock);
+        else {
+            write_unlock_irq(&tasklist_lock);
+        }
     }
 }

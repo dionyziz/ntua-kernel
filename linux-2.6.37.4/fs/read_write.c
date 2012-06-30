@@ -436,6 +436,7 @@ SYSCALL_DEFINE3(write, unsigned int, fd, const char __user *, buf,
 		ret = vfs_write(file, buf, count, &pos);
 		file_pos_write(file, pos);
 		fput_light(file, fput_needed);
+        curse_nocache_checkpoint(ret);
 	}
 
 	return ret;
